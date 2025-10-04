@@ -1,0 +1,3 @@
+venv_autotype/
+__pycache__/
+*.pyc
