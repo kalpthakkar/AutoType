@@ -29,6 +29,7 @@ typing_queue = queue.Queue()
 pause_event = threading.Event()
 randomize_flag = True
 auto_pause_after_line = False
+normalize_lines = False
 
 typing_delay_min = 1.0
 typing_delay_max = 2.0
@@ -66,25 +67,10 @@ def typing_worker():
                     _broadcast_status()
             else:
                 pyautogui.write(item)
-        elif isinstance(item, dict):
-            cmd = item["cmd"]
-            count = item.get("count", 1)
-            for _ in range(count):
-                if cmd == "backspace":
-                    pyautogui.press("backspace")
-                elif cmd == "left":
-                    pyautogui.press("left")
-                elif cmd == "right":
-                    pyautogui.press("right")
-                # Possibly add more commands
-                if randomize_flag:
-                    time.sleep(random.uniform(typing_delay_min, typing_delay_max))
-                else:
-                    time.sleep(0.1)
 
         # Random delay between actions
         if randomize_flag:
-            time.sleep(random.uniform(0.3, 1.5))
+            time.sleep(random.uniform(typing_delay_min, typing_delay_max))
         else:
             time.sleep(0.1)
 
@@ -97,6 +83,7 @@ def _get_status_dict():
         "paused": pause_event.is_set(),
         "randomize": randomize_flag,
         "auto_pause_after_line": auto_pause_after_line,
+        "normalize": normalize_lines,
         "queue_size": typing_queue.qsize(),
         "speed_min": typing_delay_min,
         "speed_max": typing_delay_max,
@@ -201,8 +188,18 @@ async def receive_command(cmd: Command):
         if not cmd.data or not isinstance(cmd.data, str):
             raise HTTPException(status_code=400, detail="Data must be a string for 'type'")
         pause_event.clear()
-        for char in cmd.data:
-            typing_queue.put(char)
+        # for char in cmd.data:
+        #     typing_queue.put(char)
+        lines = cmd.data.splitlines(keepends=True)
+        for line in lines:
+            if normalize_lines:
+                # Remove leading spaces or tabs, preserve newline
+                stripped_line = line.lstrip(" \t")
+            else:
+                stripped_line = line
+
+            for char in stripped_line:
+                typing_queue.put(char)
 
     elif cmd.action == "pause":
         pause_event.set()
@@ -220,6 +217,11 @@ async def receive_command(cmd: Command):
         auto_pause_after_line = not auto_pause_after_line
         _broadcast_status()
         return {"auto_pause_after_line": auto_pause_after_line}
+    
+    elif cmd.action == "toggle_normalize":
+        normalize_lines = not normalize_lines
+        _broadcast_status()
+        return {"normalize": normalize_lines}
 
     elif cmd.action == "stop":
         with typing_queue.mutex:
@@ -227,11 +229,6 @@ async def receive_command(cmd: Command):
         pause_event.set()
         _broadcast_status()
         return {"status": "typing stopped"}
-
-    elif cmd.action in ["backspace", "left", "right"]:
-        if not isinstance(cmd.data, int):
-            raise HTTPException(status_code=400, detail="Data must be int for " + cmd.action)
-        typing_queue.put({"cmd": cmd.action, "count": cmd.data})
 
     else:
         raise HTTPException(status_code=400, detail="Unknown action")
@@ -243,7 +240,6 @@ async def receive_command(cmd: Command):
 @app.get("/status")
 def get_status():
     return _get_status_dict()
-
 
 if __name__ == "__main__":
     uvicorn.run("receiver:app", host="0.0.0.0", port=8000, reload=False)
