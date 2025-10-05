@@ -58,7 +58,6 @@ def split_text_to_tokens(text: str) -> list[str]:
     """
     token_pattern = r'(\r\n|\n|\t| +|[^a-zA-Z0-9\s]|[a-zA-Z0-9]+)'
     tokens = re.findall(token_pattern, text)
-    print(tokens)
     return tokens
 
 def random_typo_char(correct_char: str) -> str:
