@@ -2,11 +2,15 @@
 
 ## About
 
-AutoTyper is an automated typing tool designed to simulate typing behavior, useful for testing, automation, or productivity applications. It consists of two main components: the **Sender** (client-side) and the **Receiver** (server-side). The Sender sends messages to the Receiver to simulate typing actions, while the Receiver manages these commands and processes them.
+AutoTyper is an automated typing tool designed to simulate natural typing behavior, useful for testing, automation, or productivity applications. It consists of two main components: the **Sender** (client-side) and the **Receiver** (server-side). The Sender sends messages to the Receiver to simulate typing actions, while the Receiver manages these commands and processes them.
 
 The **Sender** provides a web interface where users can input messages or code, configure typing speed, and control the typing process (start, stop, pause, resume, etc.). The **Receiver** listens for incoming commands from the Sender, processes them, and simulates typing in a terminal or browser environment.
 
 This project is built using **WebSockets** for real-time communication between the Sender and Receiver.
+
+### Web Interface - Sender Control Panel
+
+![Web Interface](static/control-panel.png)
 
 ## Structure
 
@@ -47,8 +51,8 @@ The Receiver script is a Python-based backend that listens for incoming requests
 
 1. Clone this repository to your local machine or server:
     ```bash
-    git clone <repository-url>
-    cd <repository-folder>
+    git clone https://github.com/kalpthakkar/AutoTyper.git
+    cd AutoTyper
     ```
 
 2. Install the required Python dependencies:
@@ -59,13 +63,14 @@ The Receiver script is a Python-based backend that listens for incoming requests
 3. Get your **IPv4 Address**:
     - Open Command Prompt or Terminal on your system.
     - Run `ipconfig` (Windows) or `ifconfig` (Linux/macOS) and note down your **IPv4 Address**.
+    - Note this IP address for the Sender.
 
 4. Run the Receiver server:
     ```bash
     python receiver.py
     ```
 
-5. The server should now be running on `http://<receiver-ip>:8000`. Note this IP address for the Sender.
+5. The server should now be running on `http://localhost:8000`.
 
 ### Sender Setup
 
@@ -73,8 +78,8 @@ The Sender is a Python script that connects to the Receiver's WebSocket server. 
 
 1. Clone this repository to your local machine or another system:
     ```bash
-    git clone <repository-url>
-    cd <repository-folder>
+    git clone https://github.com/kalpthakkar/AutoTyper.git
+    cd AutoTyper
     ```
 
 2. Install the required Python dependencies:
@@ -84,19 +89,16 @@ The Sender is a Python script that connects to the Receiver's WebSocket server. 
 
 3. Run the Sender with the Receiver's IP address:
     ```bash
-    python sender.py <receiver_url>
+    python sender_web/app.py <receiver_url>
+
     ```
 
-    Replace `<receiver_url>` with the following format:
+    Replace `<receiver_url>` with the following format, where `<receiver-ip>` is the IP address of the Receiver:
     ```bash
     http://<receiver-ip>:8000
     ```
 
-4. The Sender will start a web interface at `http://localhost:8000`. Open this URL in a browser to interact with the Sender interface.
-
-### Web Interface Screenshot
-
-![Web Interface](static/control-panel.png)
+4. The Sender will start a web interface at `http://localhost:5000`. Open this URL in a browser to interact with the Sender interface.
 
 ## Usage
 
@@ -105,7 +107,7 @@ The Sender is a Python script that connects to the Receiver's WebSocket server. 
 - **Start Typing**: Type your message or code in the input area and click **Run** to begin the typing simulation.
 - **Pause/Resume**: Pause the typing at any point and resume from where it left off.
 - **Stop**: Immediately stop the typing process.
-- **Humanize Typing**: Enable or disable random delays for a more human-like typing effect.
+- **Humanize Typing**: Enable or disable to mimic **true human-like typing effect** through random delays, speed fluctuations, and occasional small typos that get autocorrected.
 - **Auto Pause**: Enable auto-pausing after each line.
 - **Normalize Whitespace**: Ensure that leading spaces/tabs are ignored before typing.
 
@@ -117,7 +119,7 @@ The Sender is a Python script that connects to the Receiver's WebSocket server. 
 ## Features
 
 - **Real-time Web Interface**: Interact with the Sender via a web interface.
-- **Typing Simulation**: Simulate typing with configurable speed, pauses, and human-like typing delays.
+- **Typing Simulation**: Simulate typing with configurable speed, pauses, and true human-like typing behaviour.
 - **Auto Pause**: Automatically pauses typing after each line for more controlled typing.
 - **Normalize Whitespace**: Normalize leading spaces/tabs for more predictable typing.
 - **WebSocket Communication**: Real-time two-way communication between Sender and Receiver via WebSockets.
@@ -132,15 +134,13 @@ The Sender is a Python script that connects to the Receiver's WebSocket server. 
 
 ## License
 
-This project is licensed under the **[Custom License](./LICENSE)**. 
-
-You are allowed to:
+This project is licensed under a **Custom License**. You are allowed to:
 
 - Use this software for **personal** or **educational** purposes only.
-- Modify and adapt the code **for personal use**.
+- Modify and adapt the code for **personal use**.
 
-However, you **must** provide proper **attribution** when using or redistributing the software, and you may not use it for **commercial** purposes without explicit permission. 
+**Attribution**: If you use or redistribute this software, you must provide proper attribution to the original author (this project).  
 
-If you wish to use this project in any commercial capacity or for redistribution, please **contact the author** for permission. 
+**Commercial Use**: You may not use this software for commercial purposes without explicit permission. For commercial use or redistribution, please contact the author for permission.
 
-Please refer to the [LICENSE](./LICENSE) file for the full terms and conditions.
+For more details, please refer to the [LICENSE](./LICENSE) file in this repository.
