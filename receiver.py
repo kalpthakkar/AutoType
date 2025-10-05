@@ -141,7 +141,6 @@ def random_typo_char(correct_char: str) -> str:
     else:
         return correct_char  # No typo applied
 
-
 def human_delay(char):
     """Simulate human typing delays based on character type."""
     base_delay = random.uniform(0.05, 0.25)  # base delay
@@ -278,13 +277,13 @@ def typing_worker():
                     choice = random.choices(options, weights=weights, k=1)[0]
 
                     if choice == 'long_pause':
-                        print("Pause 10 to 20 seconds")
+                        # print("Pause 10 to 20 seconds")
                         time.sleep(random.uniform(10.0, 20.0))
                     elif choice == 'medium_pause':
-                        print("Pause 5 to 10 seconds")
+                        # print("Pause 5 to 10 seconds")
                         time.sleep(random.uniform(5.0, 10.0))
                     elif choice == 'short_pause':
-                        print("Pause 0.5 to 2 seconds")
+                        # print("Pause 0.5 to 2 seconds")
                         time.sleep(random.uniform(0.5, 2.0))
                     else:
                         pass  # No pause
@@ -297,14 +296,6 @@ def typing_worker():
                     time.sleep(0.1)  # fixed small delay
 
             _broadcast_status()
-
-
-        # # Random delay between actions
-        # if randomize_flag:
-        #     time.sleep(random.uniform(typing_delay_min, typing_delay_max))
-        # else:
-        #     time.sleep(0.1)
-
 
 def _get_status_dict():
     return {
@@ -402,9 +393,6 @@ async def set_speed_range(data: dict):
 
     _broadcast_status()
     return {"min": typing_delay_min, "max": typing_delay_max}
-
-
-
 
 @app.post("/command")
 async def receive_command(cmd: Command):
