@@ -1,4 +1,4 @@
-# receiver.py (modified)
+# receiver.py
 
 import threading
 import queue
