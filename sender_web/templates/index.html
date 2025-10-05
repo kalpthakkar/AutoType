@@ -172,73 +172,6 @@
         </section>
     </div>
 
-    <section
-      class="flex flex-wrap justify-center gap-8"
-      aria-label="Cursor control commands"
-    >
-      <!-- Backspace -->
-      <div class="flex flex-col items-center w-32">
-        <label for="backspaceCount" class="block font-semibold text-gray-700 mb-1">Backspace</label>
-        <div class="flex items-center w-full">
-          <input
-            type="number"
-            id="backspaceCount"
-            class="w-full border border-gray-300 rounded-l-md p-2 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value="1"
-            min="1"
-          />
-          <button
-            onclick="sendCursorCommand('backspace')"
-            class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-2 rounded-r-md transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            aria-label="Send backspace command"
-          >
-            Go
-          </button>
-        </div>
-      </div>
-
-      <!-- Left -->
-      <div class="flex flex-col items-center w-32">
-        <label for="leftCount" class="block font-semibold text-gray-700 mb-1">Left</label>
-        <div class="flex items-center w-full">
-          <input
-            type="number"
-            id="leftCount"
-            class="w-full border border-gray-300 rounded-l-md p-2 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value="1"
-            min="1"
-          />
-          <button
-            onclick="sendCursorCommand('left')"
-            class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-2 rounded-r-md transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            aria-label="Send left command"
-          >
-            Go
-          </button>
-        </div>
-      </div>
-
-      <!-- Right -->
-      <div class="flex flex-col items-center w-32">
-        <label for="rightCount" class="block font-semibold text-gray-700 mb-1">Right</label>
-        <div class="flex items-center w-full">
-          <input
-            type="number"
-            id="rightCount"
-            class="w-full border border-gray-300 rounded-l-md p-2 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value="1"
-            min="1"
-          />
-          <button
-            onclick="sendCursorCommand('right')"
-            class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-2 rounded-r-md transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            aria-label="Send right command"
-          >
-            Go
-          </button>
-        </div>
-      </div>
-    </section>
   </main>
 
     <script>
@@ -311,20 +244,19 @@
             const action = (status.paused) ? "resume" : "pause";
             await sendCommand(action);
             // UI update will come via WebSocket or fallback
+            const updateStatus = await getStatus()
+            applyStatusToUI(updateStatus)
         };
 
         document.getElementById("randomBtn").onclick = async () => {
             await sendCommand("toggle_random");
+            const updateStatus = await getStatus()
+            applyStatusToUI(updateStatus)
         };
 
         document.getElementById("stopBtn").onclick = async () => {
             await sendCommand("stop");
         };
-
-        async function sendCursorCommand(cmd) {
-            let count = document.getElementById(cmd + "Count").value;
-            await sendCommand(cmd, parseInt(count));
-        }
 
         async function sendCommand(action, data = null) {
             const res = await fetch(`${receiverUrl}/command`, {
@@ -344,11 +276,6 @@
 
             document.getElementById("minSpeed").value = status.speed_min.toFixed(1);
             document.getElementById("maxSpeed").value = status.speed_max.toFixed(1);
-
-
-            // Set slider position from current speed
-            const percent = ((status.speed_current - status.speed_min) / (status.speed_max - status.speed_min)) * 100;
-            document.getElementById("speedSlider").value = isNaN(percent) ? 0 : percent;
 
             const pauseBtn = document.getElementById("pauseBtn");
             const randomBtn = document.getElementById("randomBtn");
