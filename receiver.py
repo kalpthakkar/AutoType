@@ -181,7 +181,7 @@ async def set_speed_range(data: dict):
 
 @app.post("/command")
 async def receive_command(cmd: Command):
-    global randomize_flag, auto_pause_after_line
+    global randomize_flag, auto_pause_after_line, normalize_lines
 
     # For toggles, we will broadcast status after the state change
     if cmd.action == "type":
@@ -235,7 +235,6 @@ async def receive_command(cmd: Command):
 
     _broadcast_status()
     return {"status": "command received"}
-
 
 @app.get("/status")
 def get_status():
