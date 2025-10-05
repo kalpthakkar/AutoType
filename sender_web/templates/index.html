@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AutoTyper Sender</title>
   <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col">
     <main class="w-full max-w-[85%] mx-auto px-20 pt-10 pb-10 bg-white shadow-lg rounded-lg mt-12 mb-16 flex-grow">
-    <h1 class="text-3xl font-extrabold text-center mb-8 tracking-tight">AutoTyper Sender</h1>
+    <h1 class="text-3xl font-extrabold text-center mb-8 tracking-tight" style="font-family: 'Fira Code', monospace; font-weight: 700;">AutoTyper Sender</h1>
 
     <section class="mb-4">
     <div class="relative flex w-full rounded-md border border-gray-300 bg-white focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-shadow duration-200">
         <!-- Line Numbers -->
         <div id="lineNumbers"
-            class="overflow-hidden text-right pr-3 pt-3 pb-3 text-gray-400 bg-gray-100 border border-gray-300 rounded-l-md select-none font-mono text-sm leading-6 whitespace-pre"
+            class="overflow-hidden text-right pr-3 pt-3 pb-3 text-gray-400 bg-gray-100  rounded-l-md select-none font-mono text-sm leading-6 whitespace-pre"
             style="min-width: 2.5rem;">
         1
         </div>
@@ -24,7 +25,7 @@
         wrap="off"
         rows="10"
         placeholder="Enter code or message here..."
-        class="w-full p-3 resize-y placeholder-gray-400 bg-white focus:outline-none font-mono text-sm leading-6 overflow-x-auto"
+        class="w-full rounded-md p-3 resize-y placeholder-gray-400 bg-white focus:outline-none font-mono text-sm leading-6 overflow-x-auto"
         oninput="updateLineNumbers()"
         onscroll="syncScroll()"
         ></textarea>
