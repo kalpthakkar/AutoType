@@ -7,18 +7,30 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col">
-    <main class="w-full max-w-[900px] mx-auto px-20 pt-10 pb-10 bg-white shadow-lg rounded-lg mt-12 mb-16 flex-grow">
+    <main class="w-full max-w-[85%] mx-auto px-20 pt-10 pb-10 bg-white shadow-lg rounded-lg mt-12 mb-16 flex-grow">
     <h1 class="text-3xl font-extrabold text-center mb-8 tracking-tight">AutoTyper Sender</h1>
 
     <section class="mb-4">
-      <textarea
+    <div class="relative flex w-full rounded-md border border-gray-300 focus-within:ring-2 transition-shadow">
+        <!-- Line Numbers -->
+        <div id="lineNumbers"
+            class="overflow-hidden text-right pr-3 pt-3 pb-3 text-gray-400 bg-gray-100 border border-gray-300 rounded-l-md select-none font-mono text-sm leading-6 whitespace-pre"
+            style="min-width: 2.5rem;">
+        1
+        </div>
+        <!-- Textarea -->
+        <textarea
         id="codeInput"
+        wrap="off"
         rows="10"
         placeholder="Enter code or message here..."
-        class="w-full rounded-md border border-gray-300 p-3 resize-y placeholder-gray-400
-               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
-               transition-shadow duration-200 shadow-sm"></textarea>
+        class="w-full p-3 resize-y placeholder-gray-400 bg-white focus:outline-none font-mono text-sm leading-6 overflow-x-auto"
+        oninput="updateLineNumbers()"
+        onscroll="syncScroll()"
+        ></textarea>
+    </div>
     </section>
+
 
     <section class="mb-8 flex flex-wrap justify-center gap-4">
       <button
@@ -215,6 +227,46 @@
     </div>
 
   </main>
+
+    <script>
+
+        const textarea = document.getElementById("codeInput");
+        const lineNumbers = document.getElementById("lineNumbers");
+
+        const resizeObserver = new ResizeObserver(() => {
+        lineNumbers.style.height = `${textarea.clientHeight}px`;
+        });
+
+        resizeObserver.observe(textarea);
+
+        textarea.addEventListener("scroll", () => {
+        lineNumbers.scrollTop = textarea.scrollTop;
+        });
+
+        window.addEventListener("DOMContentLoaded", () => {
+            updateLineNumbers();  // initialize once
+        });
+
+        function updateLineNumbers() {
+            const textarea = document.getElementById("codeInput");
+            const lineNumbers = document.getElementById("lineNumbers");
+
+            const lines = textarea.value.split("\n").length || 1;
+            lineNumbers.textContent = Array.from({ length: lines }, (_, i) => i + 1).join("\n");
+        }
+
+        document.getElementById("codeInput").addEventListener("input", updateLineNumbers);
+
+        function syncScroll() {
+        const textarea = document.getElementById('codeInput');
+        const lineNumbers = document.getElementById('lineNumbers');
+        lineNumbers.scrollTop = textarea.scrollTop;
+        }
+
+        // Initial render on page load
+        window.onload = updateLineNumbers;
+    </script>
+
 
     <script>
         const receiverUrl = "{{ receiver_url }}";  // e.g. "http://192.168.0.10:8000"
