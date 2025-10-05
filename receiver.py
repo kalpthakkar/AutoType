@@ -1,20 +1,22 @@
-# receiver.py
+# receiver.py (modified)
+
 import threading
 import queue
 import time
 import random
 import pyautogui
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 
 app = FastAPI()
 
+# CORS (for fetch requests from UI)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # you can restrict
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,25 +25,40 @@ app.add_middleware(
 typing_queue = queue.Queue()
 pause_event = threading.Event()
 randomize_flag = True
-typer_thread = None
+auto_pause_after_line = False
+
+# Keep track of connected WebSocket clients
+connected_status_sockets: list[WebSocket] = []
 
 class Command(BaseModel):
     action: str
     data: str | int | None = None
+
 
 def typing_worker():
     while True:
         if pause_event.is_set():
             time.sleep(0.1)
             continue
+
         try:
             item = typing_queue.get(timeout=0.1)
         except queue.Empty:
             continue
+
         if item == "STOP":
             break
+
         if isinstance(item, str):
-            pyautogui.write(item)
+            if item == "\n":
+                pyautogui.press("enter")
+                # After pressing Enter, auto-pause if enabled
+                if auto_pause_after_line:
+                    pause_event.set()
+                    # Notify clients of status change
+                    _broadcast_status()
+            else:
+                pyautogui.write(item)
         elif isinstance(item, dict):
             cmd = item["cmd"]
             count = item.get("count", 1)
@@ -52,24 +69,97 @@ def typing_worker():
                     pyautogui.press("left")
                 elif cmd == "right":
                     pyautogui.press("right")
-                time.sleep(random.uniform(0.3, 1.5) if randomize_flag else 0.1)
-        time.sleep(random.uniform(0.3, 1.5) if randomize_flag else 0.1)
+                # Possibly add more commands
+                if randomize_flag:
+                    time.sleep(random.uniform(0.3, 1.5))
+                else:
+                    time.sleep(0.1)
+
+        # Random delay between actions
+        if randomize_flag:
+            time.sleep(random.uniform(0.3, 1.5))
+        else:
+            time.sleep(0.1)
+
+        # After any action, broadcast status (queue size, pause, etc.)
+        _broadcast_status()
+
+
+def _get_status_dict():
+    return {
+        "paused": pause_event.is_set(),
+        "randomize": randomize_flag,
+        "auto_pause_after_line": auto_pause_after_line,
+        "queue_size": typing_queue.qsize(),
+    }
+
+def _broadcast_status():
+    """Send the current status to all connected WebSocket clients."""
+    status = _get_status_dict()
+    # We’ll send as JSON-compatible dict
+    import json
+    msg = json.dumps({"type": "status", "data": status})
+    # Copy list to avoid modification during iteration
+    for ws in connected_status_sockets.copy():
+        try:
+            # Note: send_text is async; we need to run in asyncio context
+            import asyncio
+            asyncio.create_task(ws.send_text(msg))
+        except Exception as e:
+            print("Failed to send status to a client, removing:", e)
+            try:
+                connected_status_sockets.remove(ws)
+            except:
+                pass
+
 
 @app.on_event("startup")
 async def startup_event():
-    global typer_thread
+    # Start typing thread
     pause_event.clear()
-    typer_thread = threading.Thread(target=typing_worker, daemon=True)
-    typer_thread.start()
+    t = threading.Thread(target=typing_worker, daemon=True)
+    t.start()
+
 
 @app.on_event("shutdown")
 def shutdown_event():
     typing_queue.put("STOP")
 
+
+@app.websocket("/ws/status")
+async def status_ws_endpoint(ws: WebSocket):
+    await ws.accept()
+    connected_status_sockets.append(ws)
+    try:
+        # Send initial status
+        init = _get_status_dict()
+        await ws.send_json({"type": "status", "data": init})
+        while True:
+            # Keep connection alive; we don't expect messages from client for now
+            # But we need to receive, or else disconnect
+            msg = await ws.receive_text()
+            # Optionally you can allow client to request status explicitly
+            if msg == "get_status":
+                await ws.send_json({"type": "status", "data": _get_status_dict()})
+    except WebSocketDisconnect:
+        # Remove from list
+        try:
+            connected_status_sockets.remove(ws)
+        except ValueError:
+            pass
+    except Exception as e:
+        print("WebSocket error:", e)
+        try:
+            connected_status_sockets.remove(ws)
+        except ValueError:
+            pass
+
+
 @app.post("/command")
 async def receive_command(cmd: Command):
-    global randomize_flag
+    global randomize_flag, auto_pause_after_line
 
+    # For toggles, we will broadcast status after the state change
     if cmd.action == "type":
         if not cmd.data or not isinstance(cmd.data, str):
             raise HTTPException(status_code=400, detail="Data must be a string for 'type'")
@@ -84,31 +174,38 @@ async def receive_command(cmd: Command):
 
     elif cmd.action == "toggle_random":
         randomize_flag = not randomize_flag
+        # broadcast
+        _broadcast_status()
         return {"randomize": randomize_flag}
+
+    elif cmd.action == "toggle_auto_pause":
+        auto_pause_after_line = not auto_pause_after_line
+        _broadcast_status()
+        return {"auto_pause_after_line": auto_pause_after_line}
 
     elif cmd.action == "stop":
         with typing_queue.mutex:
             typing_queue.queue.clear()
         pause_event.set()
+        _broadcast_status()
         return {"status": "typing stopped"}
 
     elif cmd.action in ["backspace", "left", "right"]:
         if not isinstance(cmd.data, int):
-            raise HTTPException(status_code=400, detail="Data must be an integer for this command")
+            raise HTTPException(status_code=400, detail="Data must be int for " + cmd.action)
         typing_queue.put({"cmd": cmd.action, "count": cmd.data})
 
     else:
         raise HTTPException(status_code=400, detail="Unknown action")
 
+    _broadcast_status()
     return {"status": "command received"}
+
 
 @app.get("/status")
 def get_status():
-    return {
-        "paused": pause_event.is_set(),
-        "randomize": randomize_flag,
-        "queue_size": typing_queue.qsize(),
-    }
+    return _get_status_dict()
+
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("receiver:app", host="0.0.0.0", port=8000, reload=False)

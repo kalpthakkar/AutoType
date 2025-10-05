@@ -152,68 +152,102 @@
     </section>
   </main>
 
-  <script>
-    const receiverUrl = "{{ receiver_url }}";
+    <script>
+        const receiverUrl = "{{ receiver_url }}";  // e.g. "http://192.168.0.10:8000"
+        // Derive WebSocket URL (assumes same host, port 8000)
+        const wsUrl = receiverUrl.replace(/^http/, "ws") + "/ws/status";
+        let ws;
 
-    document.getElementById("runBtn").onclick = async () => {
-      const code = document.getElementById("codeInput").value;
-      if (!code.trim()) return alert("Code is empty.");
-      await sendCommand("type", code);
-    };
+        function initWebSocket() {
+            ws = new WebSocket(wsUrl);
 
-    document.getElementById("pauseBtn").onclick = async () => {
-      const status = await getStatus();
-      const action = status.paused ? "resume" : "pause";
-      await sendCommand(action);
-      updateStatus();
-    };
+            ws.onopen = () => {
+            console.log("WebSocket connected to", wsUrl);
+            // Optionally request an explicit status
+            ws.send("get_status");
+            };
 
-    document.getElementById("randomBtn").onclick = async () => {
-      await sendCommand("toggle_random");
-      updateStatus();
-    };
+            ws.onmessage = event => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === "status") {
+                const st = msg.data;
+                applyStatusToUI(st);
+                }
+            } catch (e) {
+                console.error("Invalid WS message", e, event.data);
+            }
+            };
 
-    document.getElementById("stopBtn").onclick = async () => {
-      await sendCommand("stop");
-      updateStatus();
-    };
+            ws.onclose = () => {
+            console.log("WebSocket closed. Reconnecting in 1s...");
+            setTimeout(initWebSocket, 1000);
+            };
 
-    async function sendCursorCommand(cmd) {
-      let count = document.getElementById(cmd + "Count").value;
-      await sendCommand(cmd, parseInt(count));
-    }
+            ws.onerror = err => {
+            console.error("WebSocket error", err);
+            ws.close();
+            };
+        }
 
-    async function sendCommand(action, data = null) {
-      const res = await fetch(`${receiverUrl}/command`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, data }),
-      });
-      return await res.json();
-    }
+        // UI event handlers (same as before)
+        document.getElementById("runBtn").onclick = async () => {
+            const code = document.getElementById("codeInput").value;
+            if (!code.trim()) return alert("Code is empty.");
+            await sendCommand("type", code);
+        };
 
-    async function getStatus() {
-      const res = await fetch(`${receiverUrl}/status`);
-      return await res.json();
-    }
+        document.getElementById("pauseBtn").onclick = async () => {
+            const status = await getStatus();
+            const action = status.paused ? "resume" : "pause";
+            await sendCommand(action);
+            // UI update will come via WebSocket or fallback
+        };
 
-    async function updateStatus() {
-      const status = await getStatus();
-      document.getElementById("pauseBtn").textContent = status.paused ? "Resume" : "Pause";
-      document.getElementById("randomBtn").textContent = `Random: ${status.randomize ? "On" : "Off"}`;
-    }
-    window.onload = updateStatus;
+        document.getElementById("randomBtn").onclick = async () => {
+            await sendCommand("toggle_random");
+        };
 
-    async function toggleAutoPause() {
-        const res = await fetch(`${receiverUrl}/command`, {
+        document.getElementById("stopBtn").onclick = async () => {
+            await sendCommand("stop");
+        };
+
+        async function sendCursorCommand(cmd) {
+            let count = document.getElementById(cmd + "Count").value;
+            await sendCommand(cmd, parseInt(count));
+        }
+
+        async function sendCommand(action, data = null) {
+            const res = await fetch(`${receiverUrl}/command`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "toggle_auto_pause" }),
-        });
-        const data = await res.json();
-        console.log("Auto Pause toggled:", data.auto_pause_after_line);
-    }
+            body: JSON.stringify({ action, data }),
+            });
+            return await res.json();
+        }
 
-  </script>
+        async function getStatus() {
+            const res = await fetch(`${receiverUrl}/status`);
+            return await res.json();
+        }
+
+        function applyStatusToUI(status) {
+            document.getElementById("pauseBtn").textContent = status.paused ? "Resume" : "Pause";
+            document.getElementById("randomBtn").textContent = `Random: ${status.randomize ? "On" : "Off"}`;
+            document.getElementById("autoPauseToggle").checked = status.auto_pause_after_line;
+            // You could also disable/enable buttons depending on state, etc.
+        }
+
+        function toggleAutoPause() {
+            sendCommand("toggle_auto_pause");
+        }
+
+        window.onload = () => {
+            initWebSocket();
+            // In case WebSocket misses initial status, also fetch once
+            getStatus().then(applyStatusToUI);
+        };
+    </script>
+
 </body>
 </html>
