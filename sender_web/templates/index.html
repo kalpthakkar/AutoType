@@ -199,7 +199,7 @@
 
         document.getElementById("pauseBtn").onclick = async () => {
             const status = await getStatus();
-            const action = status.paused ? "resume" : "pause";
+            const action = (status.paused) ? "resume" : "pause";
             await sendCommand(action);
             // UI update will come via WebSocket or fallback
         };
@@ -237,12 +237,12 @@
             const queueSize = status.queue_size || 0;
 
             // Label logic
-            pauseBtn.textContent = (status.paused && queueSize > 0) ? "Resume" : "Pause";
+            pauseBtn.textContent = (status.paused && status.queue_size > 0) ? "Resume" : "Pause";
             randomBtn.textContent = `Random: ${status.randomize ? "On" : "Off"}`;
             document.getElementById("autoPauseToggle").checked = status.auto_pause_after_line;
 
             // Disable pause button if there's nothing to pause or resume
-            pauseBtn.disabled = (status.queue_size === 0 && !status.paused);
+            pauseBtn.disabled = (status.queue_size === 0);
 
             // Add disabled style manually (for visual effect)
             if (pauseBtn.disabled) {
