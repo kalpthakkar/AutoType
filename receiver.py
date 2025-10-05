@@ -53,12 +53,13 @@ def split_text_to_tokens(text: str) -> list[str]:
     - Newlines
     - Tabs
     - Multiple spaces
-    - Punctuation
+    - Punctuation (including underscores)
     - Words
     """
-    token_pattern = r'(\r\n|\n|\t| +|[^\w\s]|[\w]+)'
-    print(re.findall(token_pattern, text))
-    return re.findall(token_pattern, text)
+    token_pattern = r'(\r\n|\n|\t| +|[^a-zA-Z0-9\s]|[a-zA-Z0-9]+)'
+    tokens = re.findall(token_pattern, text)
+    print(tokens)
+    return tokens
 
 def random_typo_char(correct_char: str) -> str:
     """Return a random nearby char to simulate a typo."""
@@ -164,9 +165,10 @@ def type_word(word: str, allow_typo=True):
     if the word is long enough and allow_typo is True.
     """
     typo_probability = 0.25
+    simulate_typo = random.choices([True, False], weights=[typo_probability, 1-typo_probability])[0]
     min_typo_word_len = 3
 
-    if not allow_typo or len(word) < min_typo_word_len or random.random() > typo_probability:
+    if not allow_typo or len(word) < min_typo_word_len or simulate_typo is False:
         # Just type normally
         for ch in word:
             pyautogui.write(ch)
@@ -224,7 +226,6 @@ def type_word(word: str, allow_typo=True):
             human_delay(word[i])
             i += 1
 
-
 def typing_worker():
     while True:
         if pause_event.is_set():
@@ -270,10 +271,23 @@ def typing_worker():
                     pyautogui.write(item)
                     human_delay(item)
 
-                # Random chance to pause/thinking after some tokens
-                if random.random() < 0.07:
-                    # Pause 0.5 to 2 seconds randomly to mimic thinking
-                    time.sleep(random.uniform(0.5, 2.0))
+                if any(c.isalpha() for c in item) and len(item) >= 3:
+                    # Random chance to pause/thinking after some tokens
+                    options = ['long_pause', 'medium_pause', 'short_pause', 'no_pause']
+                    weights = [0.02, 0.05, 0.03, 0.90]  # 2%, 5%, 3%, 90%
+                    choice = random.choices(options, weights=weights, k=1)[0]
+
+                    if choice == 'long_pause':
+                        print("Pause 10 to 20 seconds")
+                        time.sleep(random.uniform(10.0, 20.0))
+                    elif choice == 'medium_pause':
+                        print("Pause 5 to 10 seconds")
+                        time.sleep(random.uniform(5.0, 10.0))
+                    elif choice == 'short_pause':
+                        print("Pause 0.5 to 2 seconds")
+                        time.sleep(random.uniform(0.5, 2.0))
+                    else:
+                        pass  # No pause
 
                 # Another random tiny hesitation inside word typing is handled by human_delay()
             else:
@@ -391,27 +405,6 @@ async def set_speed_range(data: dict):
 
 
 
-# @app.post("/command")
-# async def receive_command(cmd: Command):
-#     global randomize_flag, auto_pause_after_line, normalize_lines
-
-#     # For toggles, we will broadcast status after the state change
-#     if cmd.action == "type":
-#         if not cmd.data or not isinstance(cmd.data, str):
-#             raise HTTPException(status_code=400, detail="Data must be a string for 'type'")
-
-#         pause_event.clear()
-#         lines = cmd.data.splitlines(keepends=True)
-
-#         for line in lines:
-#             if normalize_lines:
-#                 # Remove leading spaces or tabs, preserve newline
-#                 stripped_line = line.lstrip(" \t")
-#             else:
-#                 stripped_line = line
-
-#             for char in stripped_line:
-#                 typing_queue.put(char)
 
 @app.post("/command")
 async def receive_command(cmd: Command):
