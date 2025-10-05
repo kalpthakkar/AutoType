@@ -178,6 +178,7 @@ async def receive_command(cmd: Command):
     if cmd.action == "type":
         if not cmd.data or not isinstance(cmd.data, str):
             raise HTTPException(status_code=400, detail="Data must be a string for 'type'")
+        pause_event.clear()
         for char in cmd.data:
             typing_queue.put(char)
 
