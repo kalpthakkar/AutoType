@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col">
-  <main class="w-full max-w-[900px] mx-auto p-6 bg-white shadow-lg rounded-lg mt-12 mb-12 flex-grow">
+    <main class="w-full max-w-[900px] mx-auto px-20 pt-10 pb-12 bg-white shadow-lg rounded-lg mt-12 mb-16 flex-grow">
     <h1 class="text-3xl font-extrabold text-center mb-8 tracking-tight">AutoTyper Sender</h1>
 
     <section class="mb-8">
@@ -21,36 +21,68 @@
                transition-shadow duration-200 shadow-sm"></textarea>
     </section>
 
-    <section
-      class="mb-10 max-w-md w-full mx-auto bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
-      aria-label="Auto Pause Settings"
-    >
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-xl font-semibold text-gray-900 mb-1">Auto Pause</h2>
-          <p class="text-sm text-gray-500 leading-tight">Pause automatically after each line</p>
-        </div>
+    <div class="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto mb-10">
+        <section
+        class="mb-10 max-w-md w-full mx-auto bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
+        aria-label="Auto Pause Settings"
+        >
+        <div class="flex items-center justify-between">
+            <div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-1">Auto Pause</h2>
+            <p class="text-sm text-gray-500 leading-tight">Pause automatically after each line</p>
+            </div>
 
-        <label class="relative inline-flex items-center cursor-pointer" for="autoPauseToggle">
-          <input
-            type="checkbox"
-            id="autoPauseToggle"
-            class="sr-only peer"
-            onchange="toggleAutoPause()"
-            aria-label="Auto Pause After Each Line"
-          />
-          <div
-            class="w-12 h-7 bg-gray-200 rounded-full peer-checked:bg-indigo-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-400 transition-colors duration-200"
-          ></div>
-          <span
-            class="absolute left-0.5 top-0.5 w-6 h-6 bg-white border border-gray-300 rounded-full shadow-md
-                   transform peer-checked:translate-x-5 peer-checked:border-transparent
-                   transition-transform duration-200 will-change-transform"
-            aria-hidden="true"
-          ></span>
-        </label>
-      </div>
-    </section>
+            <label class="relative inline-flex items-center cursor-pointer" for="autoPauseToggle">
+            <input
+                type="checkbox"
+                id="autoPauseToggle"
+                class="sr-only peer"
+                onchange="toggleAutoPause()"
+                aria-label="Auto Pause After Each Line"
+            />
+            <div
+                class="w-12 h-7 bg-gray-200 rounded-full peer-checked:bg-indigo-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-400 transition-colors duration-200"
+            ></div>
+            <span
+                class="absolute left-0.5 top-0.5 w-6 h-6 bg-white border border-gray-300 rounded-full shadow-md
+                    transform peer-checked:translate-x-5 peer-checked:border-transparent
+                    transition-transform duration-200 will-change-transform"
+                aria-hidden="true"
+            ></span>
+            </label>
+        </div>
+        </section>
+
+        <section class="mb-8 max-w-lg w-full mx-auto">
+            <h2 class="text-xl font-semibold text-gray-900 mb-2 text-center">Typing Speed</h2>
+            <div class="flex items-center justify-between gap-4 mb-2">
+                <input
+                type="number"
+                id="minSpeed"
+                step="0.1"
+                class="border border-gray-300 rounded px-2 py-1 w-20 text-center"
+                value="1.0"
+                />
+                <span class="text-gray-600 text-sm flex-grow text-center">Current: <span id="currentSpeed">1.0s</span></span>
+                <input
+                type="number"
+                id="maxSpeed"
+                step="0.1"
+                class="border border-gray-300 rounded px-2 py-1 w-20 text-center"
+                value="2.0"
+                />
+            </div>
+            <input
+                type="range"
+                id="speedSlider"
+                min="0"
+                max="100"
+                value="0"
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                onchange="updateSliderSpeed()"
+            />
+        </section>
+    </div>
 
     <section class="mb-8 flex flex-wrap justify-center gap-4">
       <button
@@ -190,6 +222,26 @@
             };
         }
 
+        async function updateSliderSpeed() {
+            const min = parseFloat(document.getElementById("minSpeed").value);
+            const max = parseFloat(document.getElementById("maxSpeed").value);
+            const percent = parseFloat(document.getElementById("speedSlider").value);
+
+            if (isNaN(min) || isNaN(max) || min <= 0 || min > max) {
+                alert("Invalid min/max speed values");
+                return;
+            }
+
+            const res = await fetch(`${receiverUrl}/set_speed_slider`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ min, max, percent }),
+            });
+
+            const json = await res.json();
+            document.getElementById("currentSpeed").textContent = json.delay.toFixed(2) + "s";
+        }
+
         // UI event handlers (same as before)
         document.getElementById("runBtn").onclick = async () => {
             const code = document.getElementById("codeInput").value;
@@ -232,6 +284,15 @@
         }
 
         function applyStatusToUI(status) {
+
+            document.getElementById("minSpeed").value = status.speed_min.toFixed(1);
+            document.getElementById("maxSpeed").value = status.speed_max.toFixed(1);
+            document.getElementById("currentSpeed").textContent = status.speed_current.toFixed(2) + "s";
+
+            // Set slider position from current speed
+            const percent = ((status.speed_current - status.speed_min) / (status.speed_max - status.speed_min)) * 100;
+            document.getElementById("speedSlider").value = isNaN(percent) ? 0 : percent;
+
             const pauseBtn = document.getElementById("pauseBtn");
             const randomBtn = document.getElementById("randomBtn");
             const queueSize = status.queue_size || 0;

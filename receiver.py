@@ -16,7 +16,6 @@ app = FastAPI()
 
 broadcast_queue = asyncio.Queue()
 
-
 # CORS (for fetch requests from UI)
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +39,12 @@ class Command(BaseModel):
 
 
 def typing_worker():
+
+    typing_delay = 1.0  # Default delay in seconds
+    typing_delay_min = 1.0
+    typing_delay_max = 2.0
+
+
     while True:
         if pause_event.is_set():
             time.sleep(0.1)
@@ -75,9 +80,10 @@ def typing_worker():
                     pyautogui.press("right")
                 # Possibly add more commands
                 if randomize_flag:
-                    time.sleep(random.uniform(0.3, 1.5))
+                    time.sleep(typing_delay)
                 else:
                     time.sleep(0.1)
+
 
         # Random delay between actions
         if randomize_flag:
@@ -95,6 +101,9 @@ def _get_status_dict():
         "randomize": randomize_flag,
         "auto_pause_after_line": auto_pause_after_line,
         "queue_size": typing_queue.qsize(),
+        "speed_min": typing_delay_min,
+        "speed_max": typing_delay_max,
+        "speed_current": typing_delay
     }
 
 def _broadcast_status():
@@ -169,6 +178,33 @@ async def status_ws_endpoint(ws: WebSocket):
         except ValueError:
             pass
 
+@app.post("/set_speed_slider")
+async def set_speed_slider(data: dict):
+    global typing_delay, typing_delay_min, typing_delay_max
+
+    try:
+        min_val = float(data.get("min", 1.0))
+        max_val = float(data.get("max", 2.0))
+        percent = float(data.get("percent", 0))
+
+        if not (0 < min_val <= max_val):
+            raise ValueError
+        if not (0 <= percent <= 100):
+            raise ValueError
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid values")
+
+    typing_delay_min = round(min_val, 1)
+    typing_delay_max = round(max_val, 1)
+    typing_delay = round(min_val + (max_val - min_val) * (percent / 100.0), 2)
+
+    _broadcast_status()
+    return {
+        "delay": typing_delay,
+        "min": typing_delay_min,
+        "max": typing_delay_max,
+        "percent": percent
+    }
 
 @app.post("/command")
 async def receive_command(cmd: Command):
