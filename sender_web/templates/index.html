@@ -232,10 +232,24 @@
         }
 
         function applyStatusToUI(status) {
-            document.getElementById("pauseBtn").textContent = status.paused ? "Resume" : "Pause";
-            document.getElementById("randomBtn").textContent = `Random: ${status.randomize ? "On" : "Off"}`;
+            const pauseBtn = document.getElementById("pauseBtn");
+            const randomBtn = document.getElementById("randomBtn");
+            const queueSize = status.queue_size || 0;
+
+            // Label logic
+            pauseBtn.textContent = (status.paused && queueSize > 0) ? "Resume" : "Pause";
+            randomBtn.textContent = `Random: ${status.randomize ? "On" : "Off"}`;
             document.getElementById("autoPauseToggle").checked = status.auto_pause_after_line;
-            // You could also disable/enable buttons depending on state, etc.
+
+            // Disable pause button if there's nothing to pause or resume
+            pauseBtn.disabled = (status.queue_size === 0 && !status.paused);
+
+            // Add disabled style manually (for visual effect)
+            if (pauseBtn.disabled) {
+                pauseBtn.classList.add("opacity-50", "cursor-not-allowed");
+            } else {
+                pauseBtn.classList.remove("opacity-50", "cursor-not-allowed");
+            }
         }
 
         function toggleAutoPause() {

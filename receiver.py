@@ -10,8 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
+import asyncio
 
 app = FastAPI()
+
+broadcast_queue = asyncio.Queue()
+
 
 # CORS (for fetch requests from UI)
 app.add_middleware(
@@ -94,19 +98,25 @@ def _get_status_dict():
     }
 
 def _broadcast_status():
-    """Send the current status to all connected WebSocket clients."""
-    status = _get_status_dict()
-    # We’ll send as JSON-compatible dict
     import json
-    msg = json.dumps({"type": "status", "data": status})
-    # Copy list to avoid modification during iteration
-    for ws in connected_status_sockets.copy():
-        try:
-            # Note: send_text is async; we need to run in asyncio context
-            import asyncio
-            asyncio.create_task(ws.send_text(msg))
-        except Exception as e:
-            print("Failed to send status to a client, removing:", e)
+    msg = json.dumps({"type": "status", "data": _get_status_dict()})
+    try:
+        broadcast_queue.put_nowait(msg)
+    except Exception as e:
+        print("Failed to queue broadcast:", e)
+
+async def broadcast_loop():
+    while True:
+        msg = await broadcast_queue.get()
+        disconnected = []
+        for ws in connected_status_sockets:
+            try:
+                await ws.send_text(msg)
+            except:
+                disconnected.append(ws)
+
+        # Remove any disconnected sockets
+        for ws in disconnected:
             try:
                 connected_status_sockets.remove(ws)
             except:
@@ -115,10 +125,15 @@ def _broadcast_status():
 
 @app.on_event("startup")
 async def startup_event():
-    # Start typing thread
     pause_event.clear()
+
+    # Start typing thread (non-async)
     t = threading.Thread(target=typing_worker, daemon=True)
     t.start()
+
+    # Start async broadcaster loop
+    asyncio.create_task(broadcast_loop())
+
 
 
 @app.on_event("shutdown")
