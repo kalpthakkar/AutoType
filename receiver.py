@@ -3,6 +3,8 @@
 import threading
 import queue
 import time
+import string
+import re
 import random
 import pyautogui
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -31,8 +33,8 @@ randomize_flag = True
 auto_pause_after_line = False
 normalize_lines = False
 
-typing_delay_min = 1.0
-typing_delay_max = 2.0
+typing_delay_min = 0.5
+typing_delay_max = 1.5
 
 # Keep track of connected WebSocket clients
 connected_status_sockets: list[WebSocket] = []
@@ -41,9 +43,189 @@ class Command(BaseModel):
     action: str
     data: str | int | None = None
 
+import re
+import string
+
+
+def split_text_to_tokens(text: str) -> list[str]:
+    """
+    Tokenize text preserving:
+    - Newlines
+    - Tabs
+    - Multiple spaces
+    - Punctuation
+    - Words
+    """
+    token_pattern = r'(\r\n|\n|\t| +|[^\w\s]|[\w]+)'
+    print(re.findall(token_pattern, text))
+    return re.findall(token_pattern, text)
+
+def random_typo_char(correct_char: str) -> str:
+    """Return a random nearby char to simulate a typo."""
+
+    # Neighbor keys based on US QWERTY layout (simplified)
+    qwerty_neighbors = {
+        # Letters
+        'a': ['q', 'w', 's', 'z'],
+        'b': ['v', 'g', 'h', 'n'],
+        'c': ['x', 'd', 'f', 'v'],
+        'd': ['s', 'e', 'r', 'f', 'c', 'x'],
+        'e': ['w', 's', 'd', 'r'],
+        'f': ['d', 'r', 't', 'g', 'v', 'c'],
+        'g': ['f', 't', 'y', 'h', 'b', 'v'],
+        'h': ['g', 'y', 'u', 'j', 'n', 'b'],
+        'i': ['u', 'j', 'k', 'o'],
+        'j': ['h', 'u', 'i', 'k', 'm', 'n'],
+        'k': ['j', 'i', 'o', 'l', 'm'],
+        'l': ['k', 'o', 'p'],
+        'm': ['n', 'j', 'k'],
+        'n': ['b', 'h', 'j', 'm'],
+        'o': ['i', 'k', 'l', 'p'],
+        'p': ['o', 'l'],
+        'q': ['a', 's', 'w'],
+        'r': ['e', 'd', 'f', 't'],
+        's': ['a', 'q', 'w', 'e', 'd', 'x', 'z'],
+        't': ['r', 'f', 'g', 'y'],
+        'u': ['y', 'h', 'j', 'i'],
+        'v': ['c', 'f', 'g', 'b'],
+        'w': ['q', 'a', 's', 'e'],
+        'x': ['z', 's', 'd', 'c'],
+        'y': ['t', 'g', 'h', 'u'],
+        'z': ['a', 's', 'x'],
+
+        # Digits (top row neighbors)
+        '1': ['2', 'q'],
+        '2': ['1', '3', 'q', 'w'],
+        '3': ['2', '4', 'w', 'e'],
+        '4': ['3', '5', 'e', 'r'],
+        '5': ['4', '6', 'r', 't'],
+        '6': ['5', '7', 't', 'y'],
+        '7': ['6', '8', 'y', 'u'],
+        '8': ['7', '9', 'u', 'i'],
+        '9': ['8', '0', 'i', 'o'],
+        '0': ['9', 'p', '-'],
+
+        # Punctuation (simplified)
+        '-': ['0', '=', '_'],
+        '=': ['-', '[', '+'],
+        '[': [']', 'p', '{'],
+        ']': ['[', '\\', '}'],
+        ';': ['l', "'", ':'],
+        "'": [';', '"'],
+        ',': ['m', '.', '<'],
+        '.': [',', '/', '>'],
+        '/': ['.', '?'],
+        '\\': [']', '|'],
+        '`': ['1', '~'],
+    }
+
+    # For alphabet characters
+    if correct_char.lower() in qwerty_neighbors:
+        replacement = random.choice(qwerty_neighbors[correct_char.lower()])
+        return replacement.upper() if correct_char.isupper() else replacement
+
+    # For digits
+    elif correct_char in qwerty_neighbors:
+        return random.choice(qwerty_neighbors[correct_char])
+
+    # For punctuation
+    elif correct_char in string.punctuation:
+        neighbors = qwerty_neighbors.get(correct_char)
+        if neighbors:
+            return random.choice(neighbors)
+        else:
+            return correct_char  # Fallback: no typo
+
+    # For space or others
+    else:
+        return correct_char  # No typo applied
+
+
+def human_delay(char):
+    """Simulate human typing delays based on character type."""
+    base_delay = random.uniform(0.05, 0.25)  # base delay
+
+    if char in ",;:":
+        base_delay += random.uniform(0.2, 0.6)
+    elif char in ".!?":
+        base_delay += random.uniform(0.3, 0.7)
+    elif char == " ":
+        base_delay += random.uniform(0.08, 0.16)  # pause on spaces
+
+    # 9% chance for hesitation (extra pause)
+    if random.random() < 0.09:
+        base_delay += random.uniform(0.3, 1.0)
+
+    time.sleep(base_delay)
+
+def type_word(word: str, allow_typo=True):
+    """
+    Types a word character by character, simulating up to 2 realistic typos and corrections
+    if the word is long enough and allow_typo is True.
+    """
+    typo_probability = 0.25
+    min_typo_word_len = 3
+
+    if not allow_typo or len(word) < min_typo_word_len or random.random() > typo_probability:
+        # Just type normally
+        for ch in word:
+            pyautogui.write(ch)
+            human_delay(ch)
+        return
+
+    # Determine how many typos to simulate
+    typo_count = 1
+    if len(word) > 8:
+        typo_count = random.choice([1, 2])
+
+    # Determine typo positions and lengths (1 or 2 characters)
+    typo_spans = []
+    attempts = 0
+    while len(typo_spans) < typo_count and attempts < 10:
+        attempts += 1
+        start = random.randint(0, len(word) - 2)
+        length = random.choices([1, 2], weights=[0.66, 0.34])[0]
+        if start + length <= len(word):
+            # Ensure no overlapping typos
+            if all(not (start < s + l and start + length > s) for s, l in typo_spans):
+                typo_spans.append((start, length))
+
+    i = 0
+    while i < len(word):
+        # Check if a typo starts at this position
+        typo = next(((s, l) for s, l in typo_spans if s == i), None)
+
+        if typo:
+            start, length = typo
+            original = word[start:start + length]
+            typo_text = ''.join(random_typo_char(c) for c in original)
+
+            # Type wrong characters
+            pyautogui.write(typo_text)
+            for c in typo_text:
+                human_delay(c)
+
+            # Small pause to simulate human realization
+            time.sleep(random.uniform(0.2, 0.5))
+
+            # Backspace to remove wrong characters
+            for _ in range(len(typo_text)):
+                pyautogui.press('backspace')
+                time.sleep(random.uniform(0.05, 0.15))
+
+            # Re-type correct characters
+            pyautogui.write(original)
+            for c in original:
+                human_delay(c)
+
+            i += length
+        else:
+            pyautogui.write(word[i])
+            human_delay(word[i])
+            i += 1
+
 
 def typing_worker():
-
     while True:
         if pause_event.is_set():
             time.sleep(0.1)
@@ -58,24 +240,56 @@ def typing_worker():
             break
 
         if isinstance(item, str):
+            # Handle special control characters
             if item == "\n":
                 pyautogui.press("enter")
-                # After pressing Enter, auto-pause if enabled
                 if auto_pause_after_line:
                     pause_event.set()
-                    # Notify clients of status change
-                    _broadcast_status()
+                _broadcast_status()
+                continue
+
+            elif item == "\t":
+                pyautogui.press("tab")
+                _broadcast_status()
+                continue
+
+            if randomize_flag:
+
+                # Now item is either a word or punctuation or space
+                if item.startswith(" "):
+                    # Spaces: type normally with slight delay
+                    for _ in item:
+                        pyautogui.write(" ")
+                        human_delay(" ")
+                elif item.isalpha() or item.isdigit():
+                    # For words (letters or digits), type with typo chance
+                    type_word(item, allow_typo=True)
+                    time.sleep(random.uniform(typing_delay_min, typing_delay_max))
+                else:
+                    # Punctuation or other chars: type normally
+                    pyautogui.write(item)
+                    human_delay(item)
+
+                # Random chance to pause/thinking after some tokens
+                if random.random() < 0.07:
+                    # Pause 0.5 to 2 seconds randomly to mimic thinking
+                    time.sleep(random.uniform(0.5, 2.0))
+
+                # Another random tiny hesitation inside word typing is handled by human_delay()
             else:
-                pyautogui.write(item)
+                # Non-randomized: type each character with fixed delay
+                for ch in item:
+                    pyautogui.write(ch)
+                    time.sleep(0.1)  # fixed small delay
 
-        # Random delay between actions
-        if randomize_flag:
-            time.sleep(random.uniform(typing_delay_min, typing_delay_max))
-        else:
-            time.sleep(0.1)
+            _broadcast_status()
 
-        # After any action, broadcast status (queue size, pause, etc.)
-        _broadcast_status()
+
+        # # Random delay between actions
+        # if randomize_flag:
+        #     time.sleep(random.uniform(typing_delay_min, typing_delay_max))
+        # else:
+        #     time.sleep(0.1)
 
 
 def _get_status_dict():
@@ -114,7 +328,6 @@ async def broadcast_loop():
             except:
                 pass
 
-
 @app.on_event("startup")
 async def startup_event():
     pause_event.clear()
@@ -126,12 +339,9 @@ async def startup_event():
     # Start async broadcaster loop
     asyncio.create_task(broadcast_loop())
 
-
-
 @app.on_event("shutdown")
 def shutdown_event():
     typing_queue.put("STOP")
-
 
 @app.websocket("/ws/status")
 async def status_ws_endpoint(ws: WebSocket):
@@ -166,8 +376,8 @@ async def set_speed_range(data: dict):
     global typing_delay_min, typing_delay_max
 
     try:
-        min_val = float(data.get("min", 1.0))
-        max_val = float(data.get("max", 2.0))
+        min_val = float(data.get("min", 0.5))
+        max_val = float(data.get("max", 1.5))
         if not (0 < min_val <= max_val):
             raise ValueError
     except Exception:
@@ -179,6 +389,30 @@ async def set_speed_range(data: dict):
     _broadcast_status()
     return {"min": typing_delay_min, "max": typing_delay_max}
 
+
+
+# @app.post("/command")
+# async def receive_command(cmd: Command):
+#     global randomize_flag, auto_pause_after_line, normalize_lines
+
+#     # For toggles, we will broadcast status after the state change
+#     if cmd.action == "type":
+#         if not cmd.data or not isinstance(cmd.data, str):
+#             raise HTTPException(status_code=400, detail="Data must be a string for 'type'")
+
+#         pause_event.clear()
+#         lines = cmd.data.splitlines(keepends=True)
+
+#         for line in lines:
+#             if normalize_lines:
+#                 # Remove leading spaces or tabs, preserve newline
+#                 stripped_line = line.lstrip(" \t")
+#             else:
+#                 stripped_line = line
+
+#             for char in stripped_line:
+#                 typing_queue.put(char)
+
 @app.post("/command")
 async def receive_command(cmd: Command):
     global randomize_flag, auto_pause_after_line, normalize_lines
@@ -187,19 +421,29 @@ async def receive_command(cmd: Command):
     if cmd.action == "type":
         if not cmd.data or not isinstance(cmd.data, str):
             raise HTTPException(status_code=400, detail="Data must be a string for 'type'")
-        pause_event.clear()
-        # for char in cmd.data:
-        #     typing_queue.put(char)
-        lines = cmd.data.splitlines(keepends=True)
-        for line in lines:
-            if normalize_lines:
-                # Remove leading spaces or tabs, preserve newline
-                stripped_line = line.lstrip(" \t")
-            else:
-                stripped_line = line
 
-            for char in stripped_line:
-                typing_queue.put(char)
+        pause_event.clear()
+        text = cmd.data
+
+        if normalize_lines:
+            # Normalize each line by stripping leading spaces/tabs only
+            lines = text.splitlines(keepends=True)
+            normalized = ""
+            for line in lines:
+                match = re.match(r'^([ \t]*)(.*?)(\r?\n)?$', line)
+                if match:
+                    _, content, newline = match.groups()
+                    normalized += content + (newline or "")
+            text = normalized
+
+        # Now tokenize
+        tokens = split_text_to_tokens(text)
+        for token in tokens:
+            typing_queue.put(token)
+
+        _broadcast_status()
+        return {"status": "typing started", "tokens": tokens}
+
 
     elif cmd.action == "pause":
         pause_event.set()

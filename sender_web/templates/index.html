@@ -7,16 +7,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50 text-gray-900 font-sans min-h-screen flex flex-col">
-    <main class="w-full max-w-[900px] mx-auto px-20 pt-10 pb-12 bg-white shadow-lg rounded-lg mt-12 mb-16 flex-grow">
+    <main class="w-full max-w-[900px] mx-auto px-20 pt-10 pb-10 bg-white shadow-lg rounded-lg mt-12 mb-16 flex-grow">
     <h1 class="text-3xl font-extrabold text-center mb-8 tracking-tight">AutoTyper Sender</h1>
 
     <section class="mb-4">
-      <label for="codeInput" class="block mb-2 text-lg font-semibold text-gray-700">Code to Type</label>
       <textarea
         id="codeInput"
         rows="10"
         placeholder="Enter code or message here..."
-        class="w-full rounded-md border border-gray-300 p-3 resize-none placeholder-gray-400
+        class="w-full rounded-md border border-gray-300 p-3 resize-y placeholder-gray-400
                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
                transition-shadow duration-200 shadow-sm"></textarea>
     </section>
@@ -52,8 +51,7 @@
       </button>
     </section>
 
-
-    <div class="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto mb-10">
+    <div class="flex flex-col md:flex-row gap-6 max-w-4xl mx-auto mb-4">
 
         <!-- Auto Pause & Normalize Section -->
         <section class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm w-full max-w-md flex flex-col justify-center gap-4">
@@ -187,7 +185,7 @@
                 id="minSpeed"
                 min="0.1"
                 step="0.1"
-                value="1.0"
+                value="0.5"
                 class="w-24 px-3 py-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </div>
@@ -199,7 +197,7 @@
                 id="maxSpeed"
                 min="0.1"
                 step="0.1"
-                value="2.0"
+                value="1.5"
                 class="w-24 px-3 py-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </div>
